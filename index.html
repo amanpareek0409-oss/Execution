@@ -534,7 +534,7 @@ function renderCustomRuleRows(){
       <input type="text" value="${esc(r.value)}" placeholder="Value (e.g. 2 min)" style="flex:1;" oninput="currentCustomRules[${i}].value=this.value">
       <select style="flex:0.9;" onchange="currentCustomRules[${i}].phase=this.value">
         <option value="all" ${(!r.phase||r.phase==='all')?'selected':''}>All Phases</option>
-        <option value="active" ${r.phase==='active'?'selected':''}>Phase 1 / Challenge</option>
+        <option value="active" ${r.phase==='active'?'selected':''}>Phase 1</option>
         <option value="phase1_passed" ${r.phase==='phase1_passed'?'selected':''}>Phase 2</option>
         <option value="phase1and2" ${r.phase==='phase1and2'?'selected':''}>Phase 1 &amp; 2</option>
         <option value="funded_live" ${r.phase==='funded_live'?'selected':''}>Funded</option>
