@@ -536,6 +536,7 @@ function renderCustomRuleRows(){
         <option value="all" ${(!r.phase||r.phase==='all')?'selected':''}>All Phases</option>
         <option value="active" ${r.phase==='active'?'selected':''}>Phase 1 / Challenge</option>
         <option value="phase1_passed" ${r.phase==='phase1_passed'?'selected':''}>Phase 2</option>
+        <option value="phase1and2" ${r.phase==='phase1and2'?'selected':''}>Phase 1 &amp; 2</option>
         <option value="funded_live" ${r.phase==='funded_live'?'selected':''}>Funded</option>
       </select>
       <button class="btn btn-ghost btn-sm" onclick="removeCustomRuleRow(${i})">✕</button>
@@ -757,8 +758,9 @@ function renderAccountDetail(){
     rulesHtml += `</div>`;
   }
   if(a.customRules && a.customRules.length){
-    const relevantRules = a.customRules.filter(r=> !tabs.length || activeAccountPhaseTab==='all' || !r.phase || r.phase==='all' || r.phase===activeAccountPhaseTab);
-    if(relevantRules.length) rulesHtml += `<div class="form-grid">` + relevantRules.map(r=>`<div><div class="stat-label">${esc(r.label)}${r.phase&&r.phase!=='all'?` <span style="color:var(--violet-500);">(${tabs.find(t=>t.key===r.phase)?tabs.find(t=>t.key===r.phase).label:''})</span>`:''}</div><div style="font-weight:700;">${esc(r.value)}</div></div>`).join('') + `</div>`;
+    const relevantRules = a.customRules.filter(r=> !tabs.length || activeAccountPhaseTab==='all' || !r.phase || r.phase==='all' || r.phase===activeAccountPhaseTab || (r.phase==='phase1and2' && (activeAccountPhaseTab==='active'||activeAccountPhaseTab==='phase1_passed')));
+    const rulePhaseLabel = p => p==='phase1and2' ? 'Phase 1 & 2' : (tabs.find(t=>t.key===p)?.label || '');
+    if(relevantRules.length) rulesHtml += `<div class="form-grid">` + relevantRules.map(r=>`<div><div class="stat-label">${esc(r.label)}${r.phase&&r.phase!=='all'?` <span style="color:var(--violet-500);">(${rulePhaseLabel(r.phase)})</span>`:''}</div><div style="font-weight:700;">${esc(r.value)}</div></div>`).join('') + `</div>`;
   }
   rulesCard.innerHTML = rulesHtml || `<div style="color:var(--ink-faint);font-size:12.5px;">No rules added for this account yet. Edit the account to add rules.</div>`;
 
