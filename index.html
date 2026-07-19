@@ -166,7 +166,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--violet-4
     <button class="nav-item" data-tab="calculator"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2.5"/><path d="M8 6h8M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15h.01M8 19h.01M12 19h.01M16 19h.01"/></svg>Calculator</button>
     <button class="nav-item" data-tab="payouts"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Payouts</button>
     <div class="sidebar-foot">EXECUTION OVER EMOTION</div>
-    <div style="display:flex;gap:4px;margin-top:8px;padding:0 10px;">
+    <div style="display:flex;gap:4px;margin-top:8px;padding:0 10px;flex-wrap:wrap;">
       <button class="btn btn-ghost btn-sm" style="padding:5px 8px;font-size:10.5px;" onclick="exportBackup()">Export</button>
       <button class="btn btn-ghost btn-sm" style="padding:5px 8px;font-size:10.5px;" onclick="document.getElementById('importFile').click()">Import</button>
       <input type="file" id="importFile" accept=".json" class="hidden" onchange="importBackup(event)">
@@ -200,7 +200,10 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--violet-4
       <div class="topbar">
         <div><div class="page-title" id="adTitle">Account</div></div>
       </div>
+      <div id="adPhaseTabs" class="pill-select" style="margin-bottom:18px;"></div>
       <div class="stat-grid" id="adStats"></div>
+      <div class="section-title">Rules</div>
+      <div class="card card-pad" id="adRulesCard" style="margin-bottom:22px;"></div>
       <div class="section-title">Calendar</div>
       <div class="card card-pad" style="margin-bottom:22px;">
         <div class="topbar" style="margin-bottom:10px;">
@@ -371,6 +374,12 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--violet-4
     </div>
     <div class="form-row hidden" id="minDaysCountRow"><label>Minimum Trading Days Required</label><input type="number" id="accMinDays2" placeholder="5"></div>
   </div>
+  <div class="form-row">
+    <label>Additional Rules</label>
+    <div id="customRulesWrap"></div>
+    <button class="btn btn-secondary btn-sm" type="button" onclick="addCustomRuleRow()">+ Add Rule</button>
+    <div class="form-hint">e.g. Min holding time: 2 min · Consistency: 30% · Risk per trade: 1%</div>
+  </div>
   <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('accountModal')">Cancel</button><button class="btn btn-primary" onclick="saveAccount()">Save Account</button></div>
 </div></div>
 
@@ -466,7 +475,7 @@ async function loadDB(){
   ['accounts','trades','notes','goals','strategies','payouts'].forEach(k=>{ if(!DB[k]) DB[k]=[]; });
   renderAll();
 }
-async function saveDB(){ try{ localStorage.setItem('execution-db', JSON.stringify(DB)); }catch(e){ console.error(e); alert('Storage full — try removing old screenshots.'); } }
+async function saveDB(){ try{ localStorage.setItem('execution-db', JSON.stringify(DB)); }catch(e){ console.error(e); alert('Storage full — try removing old screenshots.'); } if(localFileHandle) writeToLocalFile(); }
 
 /* ============ NAV ============ */
 document.querySelectorAll('.nav-item[data-tab]').forEach(btn=>{
@@ -517,6 +526,18 @@ function buildRangeBar(containerId, currentRange, onSelect){
 }
 
 /* ============ ACCOUNTS ============ */
+let currentCustomRules = [];
+function renderCustomRuleRows(){
+  document.getElementById('customRulesWrap').innerHTML = currentCustomRules.map((r,i)=>`
+    <div class="checklist-row">
+      <input type="text" value="${esc(r.label)}" placeholder="Rule name (e.g. Min holding time)" style="flex:1.2;" oninput="currentCustomRules[${i}].label=this.value">
+      <input type="text" value="${esc(r.value)}" placeholder="Value (e.g. 2 min)" style="flex:1;" oninput="currentCustomRules[${i}].value=this.value">
+      <button class="btn btn-ghost btn-sm" onclick="removeCustomRuleRow(${i})">✕</button>
+    </div>`).join('');
+}
+function addCustomRuleRow(){ currentCustomRules.push({label:'',value:''}); renderCustomRuleRows(); }
+function removeCustomRuleRow(i){ currentCustomRules.splice(i,1); renderCustomRuleRows(); }
+
 function openAccountModal(id){
   document.getElementById('accountModal').classList.add('show');
   document.getElementById('accEditId').value = id||'';
@@ -529,11 +550,14 @@ function openAccountModal(id){
     accStartBal.value=a.startBal; accCurBal.value=a.curBal;
     accMaxDD.value=a.maxDD||''; accDailyDD.value=a.dailyDD||'';
     accMinDayRule.value=a.minDayRule||'none'; accMinDays.value=a.minDays||''; accMinDailyGainPct.value=a.minDailyGainPct||''; accMinDays2.value=a.minDays||'';
+    currentCustomRules = a.customRules ? JSON.parse(JSON.stringify(a.customRules)) : [];
   } else {
     document.getElementById('accountModalTitle').textContent = 'Add Account';
     ['accName','accFirm','accStartBal','accCurBal','accPhase1Target','accPhase2Target','accTarget','accMaxDD','accDailyDD','accMinDays','accMinDailyGainPct','accMinDays2'].forEach(i=>document.getElementById(i).value='');
     accCategory.value='funded'; accChallengeType.value='twophase'; accPhaseStatus.value='active'; accMinDayRule.value='none';
+    currentCustomRules = [];
   }
+  renderCustomRuleRows();
   toggleFundedFields();
 }
 function toggleFundedFields(){
@@ -559,6 +583,7 @@ function saveAccount(){
     startBal: parseFloat(accStartBal.value)||0, curBal: parseFloat(accCurBal.value)||0,
     maxDD: parseFloat(accMaxDD.value)||0, dailyDD: parseFloat(accDailyDD.value)||0,
     minDayRule: rule, minDays: parseFloat(rule==='fixed'?accMinDays.value:accMinDays2.value)||0, minDailyGainPct: parseFloat(accMinDailyGainPct.value)||0,
+    customRules: currentCustomRules.filter(r=>r.label.trim()||r.value.trim()),
     deleted: false, createdAt: DB.accounts.find(a=>a.id===id)?.createdAt || Date.now()
   };
   const idx = DB.accounts.findIndex(a=>a.id===id);
@@ -639,16 +664,45 @@ function nextPhaseButtons(a){
 }
 
 /* ============ ACCOUNT DETAIL PAGE ============ */
+let activeAccountPhaseTab = 'all';
+function availablePhaseTabs(a){
+  // returns list of {key,label} tabs reached so far
+  if(a.category!=='funded') return [];
+  if(a.challengeType==='instant') return []; // instant funded has no phase split
+  const tabs = [];
+  if(a.challengeType==='twophase'){
+    tabs.push({key:'active', label:'Phase 1'});
+    if(['phase1_passed','phase2_passed','funded_live'].includes(a.phaseStatus)) tabs.push({key:'phase1_passed', label:'Phase 2'});
+    if(['funded_live'].includes(a.phaseStatus)) tabs.push({key:'funded_live', label:'Funded'});
+  } else if(a.challengeType==='onephase'){
+    tabs.push({key:'active', label:'Challenge'});
+    if(a.phaseStatus==='funded_live') tabs.push({key:'funded_live', label:'Funded'});
+  }
+  return tabs;
+}
 function openAccountDetail(id){
-  activeAccountDetailId = id; adCalDate = new Date(); adRange='1M'; adMode='$';
+  activeAccountDetailId = id; adCalDate = new Date();
+  const a = DB.accounts.find(x=>x.id===id);
+  const tabs = a ? availablePhaseTabs(a) : [];
+  activeAccountPhaseTab = tabs.length ? tabs[tabs.length-1].key : 'all';
   goToTab('account-detail');
   renderAccountDetail();
 }
+function selectPhaseTab(key){ activeAccountPhaseTab = key; renderAccountDetail(); }
 function renderAccountDetail(){
   const a = DB.accounts.find(x=>x.id===activeAccountDetailId); if(!a) return;
-  const trades = accountTrades(a.id).sort((x,y)=>x.date.localeCompare(y.date));
-  const pnl = accountPnl(a.id);
-  const bal = a.curBal + pnl;
+  const tabs = availablePhaseTabs(a);
+
+  document.getElementById('adPhaseTabs').innerHTML = tabs.length ? (
+    tabs.map(t=>`<button class="pill ${activeAccountPhaseTab===t.key?'active':''}" onclick="selectPhaseTab('${t.key}')">${t.label}</button>`).join('') +
+    `<button class="pill ${activeAccountPhaseTab==='all'?'active':''}" onclick="selectPhaseTab('all')">All Combined</button>`
+  ) : '';
+
+  const allTrades = accountTrades(a.id).sort((x,y)=>x.date.localeCompare(y.date));
+  const trades = (tabs.length && activeAccountPhaseTab!=='all') ? allTrades.filter(t=>(t.phase||'active')===activeAccountPhaseTab) : allTrades;
+
+  const pnl = trades.reduce((s,t)=>s+t.pnl,0);
+  const bal = a.curBal + (activeAccountPhaseTab==='all' || !tabs.length ? allTrades.reduce((s,t)=>s+t.pnl,0) : pnl);
   const startBal = a.startBal||1;
   const growthPct = ((bal-startBal)/startBal*100);
   const wins = trades.filter(t=>t.pnl>0).length;
@@ -657,7 +711,6 @@ function renderAccountDetail(){
 
   document.getElementById('adTitle').textContent = a.name;
 
-  // valid trading days calc
   let validDaysInfo = '—';
   if(a.category==='funded' && a.minDayRule!=='none'){
     const byDay = {};
@@ -678,11 +731,29 @@ function renderAccountDetail(){
 
   document.getElementById('adStats').innerHTML = `
     <div class="stat-card"><div class="stat-label">Balance</div><div class="stat-value">${fmt(bal)}</div><div class="stat-sub ${growthPct>=0?'pos':'neg'}">${growthPct>=0?'+':''}${growthPct.toFixed(2)}%</div></div>
-    <div class="stat-card"><div class="stat-label">Net P&L</div><div class="stat-value ${pnl>=0?'pos':'neg'}">${fmt(pnl)}</div></div>
+    <div class="stat-card"><div class="stat-label">${tabs.length?'P&L (this phase)':'Net P&L'}</div><div class="stat-value ${pnl>=0?'pos':'neg'}">${fmt(pnl)}</div></div>
     <div class="stat-card"><div class="stat-label">Win Rate</div><div class="stat-value">${wr}%</div><div class="stat-sub neu">${trades.length} trades</div></div>
     <div class="stat-card"><div class="stat-label">Avg RRR</div><div class="stat-value">${avgR?rrrRatio(avgR):'—'}</div></div>
     <div class="stat-card"><div class="stat-label">Trading Days Rule</div><div class="stat-value" style="font-size:16px;">${validDaysInfo}</div></div>
   `;
+
+  // Rules panel
+  const rulesCard = document.getElementById('adRulesCard');
+  let rulesHtml = '';
+  if(a.category==='funded'){
+    const tgt = getCurrentTargetPct(a);
+    rulesHtml += `<div class="form-grid" style="margin-bottom:${a.customRules&&a.customRules.length?'14px':'0'};">`;
+    if(tgt) rulesHtml += `<div><div class="stat-label">Profit Target</div><div style="font-weight:700;">${tgt}%</div></div>`;
+    if(a.maxDD) rulesHtml += `<div><div class="stat-label">Max Drawdown</div><div style="font-weight:700;">${a.maxDD}%</div></div>`;
+    if(a.dailyDD) rulesHtml += `<div><div class="stat-label">Daily Drawdown Limit</div><div style="font-weight:700;">${a.dailyDD}%</div></div>`;
+    if(a.minDayRule==='fixed') rulesHtml += `<div><div class="stat-label">Min Trading Days</div><div style="font-weight:700;">${a.minDays}</div></div>`;
+    if(a.minDayRule==='dailygain') rulesHtml += `<div><div class="stat-label">Daily Gain Requirement</div><div style="font-weight:700;">${a.minDailyGainPct}% of starting balance</div></div>`;
+    rulesHtml += `</div>`;
+  }
+  if(a.customRules && a.customRules.length){
+    rulesHtml += `<div class="form-grid">` + a.customRules.map(r=>`<div><div class="stat-label">${esc(r.label)}</div><div style="font-weight:700;">${esc(r.value)}</div></div>`).join('') + `</div>`;
+  }
+  rulesCard.innerHTML = rulesHtml || `<div style="color:var(--ink-faint);font-size:12.5px;">No rules added for this account yet. Edit the account to add rules.</div>`;
 
   const tbody = document.getElementById('adTradesBody');
   tbody.innerHTML = trades.length ? trades.slice().reverse().map(t=>`
@@ -691,15 +762,54 @@ function renderAccountDetail(){
       <td>${t.entry}</td><td>${t.exit}</td><td>${rrrRatio(t.rrr)}</td>
       <td>${t.emotion?`<span class="tag tag-emotion">${esc(t.emotion)}</span>`:'—'}</td>
       <td class="${t.pnl>=0?'pos':'neg'}" style="font-weight:700;">${fmt(t.pnl)}</td>
-    </tr>`).join('') : `<tr><td colspan="7"><div class="empty-state">No trades logged for this account yet.</div></td></tr>`;
+    </tr>`).join('') : `<tr><td colspan="7"><div class="empty-state">No trades logged ${tabs.length&&activeAccountPhaseTab!=='all'?'for this phase':'for this account'} yet.</div></td></tr>`;
 
-  renderAdCalendar();
+  renderAdCalendar(trades);
 }
-function adCalShift(dir){ adCalDate.setMonth(adCalDate.getMonth()+dir); renderAdCalendar(); }
-function renderAdCalendar(){
-  const a = DB.accounts.find(x=>x.id===activeAccountDetailId); if(!a) return;
+function adCalShift(dir){ adCalDate.setMonth(adCalDate.getMonth()+dir); renderAccountDetail(); }
+function renderAdCalendar(trades){
   document.getElementById('adCalLabel').textContent = adCalDate.toLocaleString('default',{month:'long',year:'numeric'});
-  renderCalendarGrid('adCalHead','adCalGrid', accountTrades(a.id), adCalDate, true);
+  renderCalendarGrid('adCalHead','adCalGrid', trades, adCalDate, true);
+}
+
+/* ============ LOCAL FILE AUTO-SAVE (Chrome/Edge desktop only) ============ */
+let localFileHandle = null;
+async function connectLocalFile(){
+  if(!window.showSaveFilePicker){
+    alert('Your browser doesn\'t support this feature. It works on Chrome or Edge on a laptop/desktop. Use the Export button instead to save a backup file manually.');
+    return;
+  }
+  try{
+    const choice = confirm('Click OK to create a NEW file for auto-save.\nClick Cancel to instead open an EXISTING execution-data.json file you already have.');
+    if(choice){
+      localFileHandle = await window.showSaveFilePicker({ suggestedName:'execution-data.json', types:[{description:'JSON File', accept:{'application/json':['.json']}}] });
+      await writeToLocalFile();
+    } else {
+      const [handle] = await window.showOpenFilePicker({ types:[{description:'JSON File', accept:{'application/json':['.json']}}] });
+      localFileHandle = handle;
+      const file = await localFileHandle.getFile();
+      const text = await file.text();
+      if(text.trim()){
+        if(confirm('Load data from this file? This will replace what you currently see.')){
+          DB = JSON.parse(text);
+          ['accounts','trades','notes','goals','strategies','payouts'].forEach(k=>{ if(!DB[k]) DB[k]=[]; });
+          renderAll();
+        }
+      }
+      await writeToLocalFile();
+    }
+    document.getElementById('fileConnectStatus').textContent = '✓ Connected: ' + localFileHandle.name;
+    document.getElementById('connectFileBtn').textContent = '📁 Reconnect File';
+    saveDB();
+  }catch(e){ if(e.name!=='AbortError') console.error(e); }
+}
+async function writeToLocalFile(){
+  if(!localFileHandle) return;
+  try{
+    const writable = await localFileHandle.createWritable();
+    await writable.write(JSON.stringify(DB, null, 2));
+    await writable.close();
+  }catch(e){ console.error('Local file write failed', e); }
 }
 
 /* ============ JOURNAL ============ */
@@ -753,7 +863,10 @@ function saveTrade(){
   const entry=parseFloat(tEntry.value)||0, exit=parseFloat(tExit.value)||0, sl=parseFloat(tSL.value)||0, tp=parseFloat(tTP.value)||0, lots=parseFloat(tLots.value)||0.01;
   const {pnl,pips,rrr} = calcTradeMath({dir,entry,exit,sl,tp,lots});
   const id = tradeEditId.value || uid();
-  const data = { id, accountId: tradeAccount.value, date: tradeDate.value, dir, entry, exit, sl, tp, lots, result: tResult.value, notes: tNotes.value, emotion: tEmotion.value, shots: [...currentShotsBuffer], pnl, pips, rrr };
+  const existing = DB.trades.find(t=>t.id===id);
+  const acc = DB.accounts.find(a=>a.id===tradeAccount.value);
+  const phase = existing ? existing.phase : (acc ? acc.phaseStatus : 'active');
+  const data = { id, accountId: tradeAccount.value, date: tradeDate.value, dir, entry, exit, sl, tp, lots, result: tResult.value, notes: tNotes.value, emotion: tEmotion.value, shots: [...currentShotsBuffer], pnl, pips, rrr, phase };
   const idx = DB.trades.findIndex(t=>t.id===id);
   if(idx>=0) DB.trades[idx]=data; else DB.trades.push(data);
   saveDB(); closeModal('tradeModal'); renderAll();
@@ -1009,7 +1122,6 @@ function renderDashboard(){
   const lifetimePayouts = DB.payouts.reduce((s,p)=>s+p.amount,0);
 
   document.getElementById('dashStats').innerHTML = `
-    <div class="stat-card"><div class="stat-label">Total Balance (All Accounts)</div><div class="stat-value">${fmt(totalBal)}</div></div>
     <div class="stat-card"><div class="stat-label">Net P&L (All Trades)</div><div class="stat-value ${netPnl>=0?'pos':'neg'}">${fmt(netPnl)}</div></div>
     <div class="stat-card"><div class="stat-label">Win Rate</div><div class="stat-value">${wr}%</div><div class="stat-sub neu">${wins}W / ${losses}L / ${allTrades.length} total</div></div>
     <div class="stat-card"><div class="stat-label">Avg RRR</div><div class="stat-value">${avgRRR?rrrRatio(avgRRR):'—'}</div></div>
